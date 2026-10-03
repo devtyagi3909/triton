@@ -71,15 +71,18 @@ def test_compile_only_sm100() -> None:
     assert k.asm["cubin"] != b""
 
 
-def test_compile_only_sm107_requires_ptx94():
+@pytest.mark.parametrize("arch, ptx_version", [(100, 93), (100, 94), (107, 94)])
+def test_cuda_ptx_features(arch, ptx_version):
+    from triton.backends.nvidia.compiler import CUDAOptions, get_features
 
-    @triton.jit
-    def kernel(out):
-        tl.store(out, 1)
+    assert get_features(CUDAOptions(ptx_version=ptx_version), arch) == f"+ptx{ptx_version}"
 
-    source = ASTSource(kernel, signature={"out": "*i32"})
+
+def test_sm107_requires_ptx94():
+    from triton.backends.nvidia.compiler import CUDAOptions, get_features
+
     with pytest.raises(ValueError, match="SM107 requires PTX 9.4 or later"):
-        triton.compile(source, target=GPUTarget("cuda", 107, 32), options={"ptx_version": 93})
+        get_features(CUDAOptions(ptx_version=93), 107)
 
 
 @pytest.mark.parametrize("seed_type, dtype", [("u32", tl.uint32), ("u64", tl.uint32), ("u64", tl.uint64)])
